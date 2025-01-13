@@ -1,31 +1,30 @@
-import * as path from "path";
-import * as fs from "fs";
-import { createRequire } from "module";
 import {
   AgentRuntime,
   elizaLogger,
-  type Character,
-  validateCharacterConfig,
   stringToUuid,
+  type Character,
   type IDatabaseAdapter,
-} from "@ai16z/eliza";
+} from "@elizaos/core"
+import * as fs from "fs"
+import { createRequire } from "module"
+import * as path from "path"
 
-import { loadCharacters } from "./loader.js";
-import { DirectClient } from "@ai16z/client-direct";
-import { pathToFileURL, fileURLToPath } from "url";
+import { DirectClient } from "@elizaos/client-direct"
+import { fileURLToPath } from "url"
+import { loadCharacters } from "./loader.js"
 
 // ES Module dirname equivalent
-const __filename = fileURLToPath(import.meta.url);
-const __dirname = path.dirname(__filename);
+const __filename = fileURLToPath(import.meta.url)
+const __dirname = path.dirname(__filename)
 
 interface Plugin {
-  name: string;
-  description: string;
-  actions?: any[];
-  providers?: any[];
-  evaluators?: any[];
-  services?: any[];
-  clients?: any[];
+  name: string
+  description: string
+  actions?: any[]
+  providers?: any[]
+  evaluators?: any[]
+  services?: any[]
+  clients?: any[]
 }
 
 // Minimal DatabaseAdapter Mock
@@ -56,11 +55,11 @@ const minimalDatabaseAdapter: IDatabaseAdapter = {
 
   getRoom: async () =>
     stringToUuid(
-      "mock-room-id",
+      "mock-room-id"
     ) as `${string}-${string}-${string}-${string}-${string}`,
   createRoom: async () =>
     stringToUuid(
-      "mock-room-id",
+      "mock-room-id"
     ) as `${string}-${string}-${string}-${string}-${string}`,
   removeRoom: async () => {},
   getRoomsForParticipant: async () => [],
@@ -74,122 +73,122 @@ const minimalDatabaseAdapter: IDatabaseAdapter = {
   createRelationship: async () => true,
   getRelationship: async () => null,
   getRelationships: async () => [],
-};
+}
 
 // Cache Adapter Implementation
 class CompatibleCacheAdapter {
-  private data = new Map<string, string>();
+  private data = new Map<string, string>()
 
   async get<T = unknown>(key: string): Promise<T | undefined> {
-    const value = this.data.get(key);
-    return (value ? JSON.parse(value) : undefined) as T;
+    const value = this.data.get(key)
+    return (value ? JSON.parse(value) : undefined) as T
   }
   async set<T>(key: string, value: T): Promise<void> {
-    this.data.set(key, JSON.stringify(value));
+    this.data.set(key, JSON.stringify(value))
   }
   async delete(key: string): Promise<void> {
-    this.data.delete(key);
+    this.data.delete(key)
   }
 }
 
 // Function to dynamically load plugins from ./src/plugins
 
 async function loadLocalPlugins(): Promise<Plugin[]> {
-  const pluginsDir = path.resolve(__dirname, "../plugins");
-  const plugins: Plugin[] = [];
+  const pluginsDir = path.resolve(__dirname, "../plugins")
+  const plugins: Plugin[] = []
 
-  elizaLogger.info(`Starting plugin loading process.`); // Ensure logger works
-  console.log(`DEBUG: Checking plugins directory: ${pluginsDir}`); // Fallback log
+  elizaLogger.info(`Starting plugin loading process.`) // Ensure logger works
+  console.log(`DEBUG: Checking plugins directory: ${pluginsDir}`) // Fallback log
 
   if (fs.existsSync(pluginsDir)) {
-    const entries = fs.readdirSync(pluginsDir);
-    elizaLogger.info(`Found entries in ${pluginsDir}: ${entries.join(", ")}`);
-    console.log(`DEBUG: Entries in ${pluginsDir}: ${entries.join(", ")}`); // Fallback log
+    const entries = fs.readdirSync(pluginsDir)
+    elizaLogger.info(`Found entries in ${pluginsDir}: ${entries.join(", ")}`)
+    console.log(`DEBUG: Entries in ${pluginsDir}: ${entries.join(", ")}`) // Fallback log
 
     for (const entry of entries) {
-      const pluginPath = path.join(pluginsDir, entry);
-      let importedPlugin: any;
+      const pluginPath = path.join(pluginsDir, entry)
+      let importedPlugin: any
 
       try {
         if (fs.statSync(pluginPath).isDirectory()) {
-          elizaLogger.info(`Checking plugin directory: ${pluginPath}`);
-          console.log(`DEBUG: Directory detected: ${pluginPath}`); // Fallback log
+          elizaLogger.info(`Checking plugin directory: ${pluginPath}`)
+          console.log(`DEBUG: Directory detected: ${pluginPath}`) // Fallback log
 
           const indexFilePath = fs.existsSync(path.join(pluginPath, "index.js"))
             ? path.join(pluginPath, "index.js")
-            : path.join(pluginPath, "index.ts");
+            : path.join(pluginPath, "index.ts")
 
           if (fs.existsSync(indexFilePath)) {
-            importedPlugin = await import(indexFilePath);
-            elizaLogger.info(`Loaded plugin from index file: ${indexFilePath}`);
-            console.log(`DEBUG: Loaded plugin file: ${indexFilePath}`); // Fallback log
+            importedPlugin = await import(indexFilePath)
+            elizaLogger.info(`Loaded plugin from index file: ${indexFilePath}`)
+            console.log(`DEBUG: Loaded plugin file: ${indexFilePath}`) // Fallback log
           } else {
             elizaLogger.warn(
-              `No index file found in plugin directory: ${pluginPath}`,
-            );
-            console.log(`DEBUG: Missing index file in ${pluginPath}`); // Fallback log
-            continue;
+              `No index file found in plugin directory: ${pluginPath}`
+            )
+            console.log(`DEBUG: Missing index file in ${pluginPath}`) // Fallback log
+            continue
           }
         } else if (pluginPath.endsWith(".js") || pluginPath.endsWith(".ts")) {
-          elizaLogger.info(`Loading plugin file: ${pluginPath}`);
-          console.log(`DEBUG: Loading file: ${pluginPath}`); // Fallback log
-          importedPlugin = await import(pluginPath);
+          elizaLogger.info(`Loading plugin file: ${pluginPath}`)
+          console.log(`DEBUG: Loading file: ${pluginPath}`) // Fallback log
+          importedPlugin = await import(pluginPath)
         } else {
-          elizaLogger.warn(`Skipping unsupported plugin entry: ${pluginPath}`);
-          console.log(`DEBUG: Skipping unsupported file: ${pluginPath}`); // Fallback log
-          continue;
+          elizaLogger.warn(`Skipping unsupported plugin entry: ${pluginPath}`)
+          console.log(`DEBUG: Skipping unsupported file: ${pluginPath}`) // Fallback log
+          continue
         }
 
-        const plugin = importedPlugin.default || importedPlugin;
+        const plugin = importedPlugin.default || importedPlugin
         if (plugin && plugin.name && plugin.description) {
-          plugins.push(plugin as Plugin);
-          elizaLogger.info(`Successfully loaded plugin: ${plugin.name}`);
-          console.log(`DEBUG: Successfully loaded: ${plugin.name}`); // Fallback log
+          plugins.push(plugin as Plugin)
+          elizaLogger.info(`Successfully loaded plugin: ${plugin.name}`)
+          console.log(`DEBUG: Successfully loaded: ${plugin.name}`) // Fallback log
         } else {
-          elizaLogger.warn(`Invalid plugin structure in: ${entry}`);
-          console.log(`DEBUG: Invalid plugin structure: ${entry}`); // Fallback log
+          elizaLogger.warn(`Invalid plugin structure in: ${entry}`)
+          console.log(`DEBUG: Invalid plugin structure: ${entry}`) // Fallback log
         }
       } catch (error) {
-        elizaLogger.error(`Failed to load plugin from: ${entry}`, error);
-        console.error(`DEBUG: Error loading plugin from: ${entry}`, error); // Fallback log
+        elizaLogger.error(`Failed to load plugin from: ${entry}`, error)
+        console.error(`DEBUG: Error loading plugin from: ${entry}`, error) // Fallback log
       }
     }
 
-    return plugins;
+    return plugins
   } else {
-    elizaLogger.warn(`Plugins directory not found: ${pluginsDir}`);
-    console.log(`DEBUG: Directory not found: ${pluginsDir}`); // Fallback log
+    elizaLogger.warn(`Plugins directory not found: ${pluginsDir}`)
+    console.log(`DEBUG: Directory not found: ${pluginsDir}`) // Fallback log
   }
 
   elizaLogger.info(
-    `Finished plugin loading process. Loaded plugins: ${plugins.length}`,
-  );
+    `Finished plugin loading process. Loaded plugins: ${plugins.length}`
+  )
   console.log(
-    `DEBUG: Final loaded plugins: ${plugins.map((p) => p.name).join(", ")}`,
-  ); // Fallback log
+    `DEBUG: Final loaded plugins: ${plugins.map((p) => p.name).join(", ")}`
+  ) // Fallback log
 
-  return plugins;
+  return plugins
 }
 
 // Function to resolve plugins from their string names
 
 async function resolvePlugins(pluginNames: string[]): Promise<Plugin[]> {
-  const localPlugins = await loadLocalPlugins();
+  const localPlugins = await loadLocalPlugins()
 
   elizaLogger.info(
-    `Local plugins available: ${localPlugins.map((p) => p.name).join(", ")}`,
-  );
+    `Local plugins available: ${localPlugins.map((p) => p.name).join(", ")}`
+  )
 
   return Promise.all(
     pluginNames.map(async (pluginName) => {
       // Check if the plugin is local
       const localPlugin = localPlugins.find(
-        (plugin) => plugin.name === pluginName,
-      );
+        (plugin) => plugin.name === pluginName
+      )
 
       if (localPlugin) {
-        elizaLogger.info(`Resolved local plugin: ${pluginName}`);
-        return localPlugin;
+        elizaLogger.info(`Resolved local plugin: ${pluginName}`)
+        return localPlugin
       }
 
       // Attempt to resolve from node_modules
@@ -198,71 +197,71 @@ async function resolvePlugins(pluginNames: string[]): Promise<Plugin[]> {
           pluginName,
           {
             paths: [process.cwd()],
-          },
-        );
-        elizaLogger.info(`Resolved node_modules plugin: ${pluginName}`);
-        const importedPlugin = await import(resolvedPath);
-        return importedPlugin.default || importedPlugin;
+          }
+        )
+        elizaLogger.info(`Resolved node_modules plugin: ${pluginName}`)
+        const importedPlugin = await import(resolvedPath)
+        return importedPlugin.default || importedPlugin
       } catch (error) {
-        elizaLogger.error(`Failed to resolve plugin: ${pluginName}`, error);
-        throw error;
+        elizaLogger.error(`Failed to resolve plugin: ${pluginName}`, error)
+        throw error
       }
-    }),
-  );
+    })
+  )
 }
 
 // Type Guard to check if plugins are strings
 function isStringArray(plugins: unknown): plugins is string[] {
-  return Array.isArray(plugins) && plugins.every((p) => typeof p === "string");
+  return Array.isArray(plugins) && plugins.every((p) => typeof p === "string")
 }
 
 async function main() {
-  elizaLogger.info("Starting Eliza Agent...");
+  elizaLogger.info("Starting Eliza Agent...")
 
-  const characters: Character[] = await loadCharacters("characters.json");
-  const localPlugins = await loadLocalPlugins();
+  const characters: Character[] = await loadCharacters("characters.json")
+  const localPlugins = await loadLocalPlugins()
   console.log(
-    `DEBUG: Local plugins loaded: ${localPlugins.map((p) => p.name).join(", ")}`,
-  );
+    `DEBUG: Local plugins loaded: ${localPlugins.map((p) => p.name).join(", ")}`
+  )
 
   for (const character of characters) {
     const resolvedPlugins = isStringArray(character.plugins)
       ? await resolvePlugins(character.plugins)
-      : (character.plugins as Plugin[]);
+      : (character.plugins as Plugin[])
 
-    const combinedPlugins = [...resolvedPlugins, ...localPlugins];
+    const combinedPlugins = [...resolvedPlugins, ...localPlugins]
 
     elizaLogger.info(
       `Character "${character.name}" loaded with plugins: ${combinedPlugins.map(
-        (p) => p.name,
-      )}`,
-    );
+        (p) => p.name
+      )}`
+    )
 
     const runtime = new AgentRuntime({
       character,
       plugins: combinedPlugins,
       token: "dummy-token",
       agentId: stringToUuid(
-        character.name,
+        character.name
       ) as `${string}-${string}-${string}-${string}-${string}`,
       modelProvider: character.modelProvider,
       databaseAdapter: minimalDatabaseAdapter,
       cacheManager: new CompatibleCacheAdapter(),
       logging: true,
-    });
+    })
 
-    elizaLogger.success(`Agent "${character.name}" initialized successfully!`);
+    elizaLogger.success(`Agent "${character.name}" initialized successfully!`)
 
-    const directClient = new DirectClient();
-    directClient.registerAgent(runtime);
-    directClient.start(3000);
+    const directClient = new DirectClient()
+    directClient.registerAgent(runtime)
+    directClient.start(3000)
   }
 
-  elizaLogger.success("Eliza agents started successfully!");
+  elizaLogger.success("Eliza agents started successfully!")
 }
 
 // Run the main function
 main().catch((err) => {
-  console.error("Fatal error:", err);
-  process.exit(1);
-});
+  console.error("Fatal error:", err)
+  process.exit(1)
+})
