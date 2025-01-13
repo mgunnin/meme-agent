@@ -52,3 +52,5 @@ prisma/migrations/
 .env.*.local
 .env.development
 .env.production
+
+.specstory
